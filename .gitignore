@@ -1,0 +1,75 @@
+HELP.md
+
+### ==================== Java / Maven ====================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### ==================== React / Node.js ====================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+dist/
+.next/
+out/
+.nuxt/
+.cache/
+.parcel-cache/
+.eslintcache
+*.tsbuildinfo
+
+### ==================== 通用 ====================
+
+### VS Code ###
+.vscode/
+
+### OS ###
+.DS_Store
+Thumbs.db
+desktop.ini
+
+### Logs ###
+*.log
+logs/
+
+### Temp ###
+temp/
+
+### AI Agent ###
+.agent/
+
+### 环境与敏感配置 ###
+.env
+.env.local
+.env.*.local
+**/application-local.yml
+**/application-prod.yml
