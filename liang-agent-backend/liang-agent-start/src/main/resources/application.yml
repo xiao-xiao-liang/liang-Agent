@@ -1,0 +1,12 @@
+server:
+  port: 8888
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+      enabled: true
+
+# ==================== Sprint 0：最小启动配置 ====================
+# 后续 Sprint 将按功能链路逐步追加以下配置：
+#   Sprint 1 → MySQL 数据源、Spring AI（OpenAI/通义千问）、Tavily MCP
+#   Sprint 3 → MinIO 对象存储、Milvus 向量存储
