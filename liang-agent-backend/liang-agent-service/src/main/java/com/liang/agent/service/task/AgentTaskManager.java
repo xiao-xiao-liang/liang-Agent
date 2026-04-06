@@ -1,6 +1,7 @@
 package com.liang.agent.service.task;
 
 import com.liang.agent.common.convention.exception.ServiceException;
+import com.liang.agent.common.response.AgentResponse;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -54,6 +55,9 @@ public class AgentTaskManager {
 
     /**
      * 停止任务（用户中断）
+     * <p>
+     * 先发送 "⏹ 用户已停止生成" 停止消息给前端，再关闭 Sink 并取消订阅。
+     * </p>
      */
     public void stopTask(String conversationId) {
         Optional.ofNullable(runningTasks.remove(conversationId)).ifPresent(taskInfo -> {
@@ -64,8 +68,16 @@ public class AgentTaskManager {
                     d.dispose();
                 }
             });
-            // 关闭 Sink
-            taskInfo.getSink().tryEmitComplete();
+            // 发送停止消息给前端，再关闭 Sink
+            Sinks.Many<String> sink = taskInfo.getSink();
+            if (sink != null) {
+                try {
+                    sink.tryEmitNext(AgentResponse.text("⏹ 用户已停止生成\n"));
+                    sink.tryEmitComplete();
+                } catch (Exception e) {
+                    log.warn("发送停止消息失败: conversationId={}", conversationId, e);
+                }
+            }
         });
     }
 
@@ -101,6 +113,11 @@ public class AgentTaskManager {
             boolean stale = elapsed > TASK_TIMEOUT_MS;
             if (stale) {
                 log.warn("清理过期任务: conversationId={}, 已运行{}ms", entry.getKey(), elapsed);
+                // 取消响应式订阅，中断可能仍在等待的 blockLast()
+                Optional.ofNullable(entry.getValue().getDisposable()).ifPresent(d -> {
+                    if (!d.isDisposed())
+                        d.dispose();
+                });
                 entry.getValue().getSink().tryEmitComplete();
             }
             return stale;
