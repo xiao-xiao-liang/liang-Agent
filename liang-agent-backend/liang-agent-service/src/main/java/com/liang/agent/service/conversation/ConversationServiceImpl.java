@@ -10,6 +10,7 @@ import com.liang.agent.service.mapper.ConversationMapper;
 import com.liang.agent.service.message.ChatMessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -44,7 +45,16 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         // 标题截取前 100 字符
         conversation.setTitle(firstQuestion.length() > 100 ? firstQuestion.substring(0, 100) : firstQuestion);
         conversation.setLastTime(LocalDateTime.now());
-        save(conversation);
+
+        try {
+            save(conversation);
+        } catch (DuplicateKeyException e) {
+            // 并发创建场景：唯一索引拦截第二次插入，回退查询已有记录
+            log.info("会话已被并发创建, conversationId={}", conversationId);
+            return getOne(new LambdaQueryWrapper<Conversation>()
+                    .eq(Conversation::getConversationId, conversationId));
+        }
+
         log.info("新建会话: conversationId={}, agentType={}", conversationId, agentType);
         return conversation;
     }
@@ -55,13 +65,13 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
                 .orderByDesc(Conversation::getLastTime));
 
         return conversations.stream()
-                .map(c -> ConversationListVO.builder()
-                        .conversationId(c.getConversationId())
-                        .agentType(c.getAgentType())
-                        .title(c.getTitle())
-                        .lastTime(c.getLastTime())
-                        .createTime(c.getCreateTime())
-                        .build())
+                .map(c -> new ConversationListVO(
+                        c.getConversationId(),
+                        c.getAgentType(),
+                        c.getTitle(),
+                        c.getLastTime(),
+                        c.getCreateTime()
+                ))
                 .toList();
     }
 

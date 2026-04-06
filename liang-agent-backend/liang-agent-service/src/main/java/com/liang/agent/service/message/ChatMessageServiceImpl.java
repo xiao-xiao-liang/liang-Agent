@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.liang.agent.model.entity.ChatMessage;
+import com.liang.agent.model.enums.MessageRole;
 import com.liang.agent.model.vo.MessageVO;
 import com.liang.agent.service.mapper.ChatMessageMapper;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
     public ChatMessage saveUserMessage(String conversationId, String content) {
         ChatMessage chatMessage = new ChatMessage();
         chatMessage.setConversationId(conversationId);
-        chatMessage.setRole("user");
+        chatMessage.setRole(MessageRole.USER);
         chatMessage.setContent(content);
         save(chatMessage);
         return chatMessage;
@@ -33,7 +34,7 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
 
     @Override
     public ChatMessage saveAssistantMessage(ChatMessage chatMessage) {
-        chatMessage.setRole("assistant");
+        chatMessage.setRole(MessageRole.ASSISTANT);
         save(chatMessage);
         return chatMessage;
     }
@@ -62,17 +63,17 @@ public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatM
                 .orderByAsc(ChatMessage::getCreateTime));
 
         return chatMessages.stream()
-                .map(m -> MessageVO.builder()
-                        .id(m.getId())
-                        .role(m.getRole())
-                        .content(m.getContent())
-                        .thinking(m.getThinking())
-                        .tools(m.getTools())
-                        .reference(m.getReference())
-                        .recommend(m.getRecommend())
-                        .fileId(m.getFileId())
-                        .createTime(m.getCreateTime())
-                        .build())
+                .map(m -> new MessageVO(
+                        m.getId(),
+                        m.getRole().getValue(),
+                        m.getContent(),
+                        m.getThinking(),
+                        m.getTools(),
+                        m.getReference(),
+                        m.getRecommend(),
+                        m.getFileId(),
+                        m.getCreateTime()
+                ))
                 .toList();
     }
 
