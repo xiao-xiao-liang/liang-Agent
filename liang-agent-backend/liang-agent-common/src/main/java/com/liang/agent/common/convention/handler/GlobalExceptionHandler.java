@@ -5,6 +5,8 @@ import com.liang.agent.common.convention.exception.AbstractException;
 import com.liang.agent.common.convention.result.Result;
 import com.liang.agent.common.convention.result.Results;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 全局异常处理器
@@ -41,6 +44,18 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 拦截方法参数级校验异常（@Validated + @NotBlank 等）
+     */
+    @ExceptionHandler(value = ConstraintViolationException.class)
+    public Result<Void> constraintViolationException(HttpServletRequest request, ConstraintViolationException ex) {
+        String message = ex.getConstraintViolations().stream()
+                .map(ConstraintViolation::getMessage)
+                .collect(Collectors.joining("; "));
+        log.error("[{}] {} [ex] {}", request.getMethod(), getUrl(request), message);
+        return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), message);
+    }
+
+    /**
      * 拦截应用内抛出的异常
      */
     @ExceptionHandler(value = {AbstractException.class})
@@ -57,6 +72,15 @@ public class GlobalExceptionHandler {
         }
         log.error("[{}] {} [ex] {} \n\n{}", request.getMethod(), request.getRequestURL().toString(), ex, stackTraceBuilder);
         return Results.failure(ex);
+    }
+
+    /**
+     * 拦截静态资源未找到异常（如 favicon.ico）
+     */
+    @ExceptionHandler(value = org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public Result<Void> noResourceFoundExceptionHandler(HttpServletRequest request, org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        log.warn("[{}] {} - {}", request.getMethod(), getUrl(request), ex.getMessage());
+        return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), ex.getMessage());
     }
 
     /**
