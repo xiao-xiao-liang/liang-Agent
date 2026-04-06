@@ -19,5 +19,17 @@
             <groupId>com.liang.agent</groupId>
             <artifactId>liang-agent-model</artifactId>
         </dependency>
+
+        <!-- MyBatis-Plus（含 Mapper 扫描、SQL Session 等） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        </dependency>
+
+        <!-- Reactor Core（AgentTaskManager 使用 Sinks/Disposable） -->
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+        </dependency>
     </dependencies>
 </project>

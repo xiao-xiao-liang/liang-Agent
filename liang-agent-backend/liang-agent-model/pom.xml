@@ -19,5 +19,11 @@
             <groupId>com.liang.agent</groupId>
             <artifactId>liang-agent-common</artifactId>
         </dependency>
+
+        <!-- MyBatis-Plus 注解（@TableName, @TableId 等） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-annotation</artifactId>
+        </dependency>
     </dependencies>
 </project>

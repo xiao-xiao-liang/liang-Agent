@@ -15,10 +15,23 @@
     <description>启动入口模块 - Controller、Config、应用启动</description>
 
     <dependencies>
-        <!-- 当前仅依赖 common，后续 Sprint 按需引入 core / service -->
+        <!-- 聚合：core → service → model → common -->
         <dependency>
             <groupId>com.liang.agent</groupId>
-            <artifactId>liang-agent-common</artifactId>
+            <artifactId>liang-agent-core</artifactId>
+        </dependency>
+
+        <!-- Druid 连接池 -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid-spring-boot-3-starter</artifactId>
+        </dependency>
+
+        <!-- MySQL JDBC 驱动 -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 
