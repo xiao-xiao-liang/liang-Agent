@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * WebSearch ReAct Agent
  * <p>
  * 基于 ReAct（Reasoning + Acting）模式的联网搜索智能体。
- * 通过 MCP 协议调用 Tavily 搜索引擎，获取实时互联网信息并生成回答。
+ * 通过 REST API 调用 Tavily 搜索引擎，获取实时互联网信息并生成回答。
  * </p>
  * <p>
  * 工作流程：
@@ -47,6 +47,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>多轮迭代直到 LLM 给出最终回答或达到最大轮次</li>
  *   <li>持久化回答 → 异步生成推荐问题</li>
  * </ol>
+ * <p><b>线程安全性：NOT thread-safe。</b>
+ * 每次请求由 Controller 创建独立实例，实例内部所有可变状态（textBuffer、thinkingBuffer、
+ * toolCallArgsBuffers 等）被限制在单个虚拟线程中操作，不可跨线程共享实例。</p>
  */
 @Slf4j
 public class WebSearchReactAgent extends BaseAgent {
@@ -111,17 +114,16 @@ public class WebSearchReactAgent extends BaseAgent {
 
     @Override
     public Flux<String> execute(String conversationId, String query) {
-        this.currentConversationId = conversationId;
-        startTimer();
-
         // 创建 Sink
         Sinks.Many<String> sink = Sinks.many().multicast().onBackpressureBuffer();
 
         // 注册任务（并发控制，冲突时抛 ServiceException）
         taskManager.register(conversationId, sink);
 
-        // 异步执行
+        // 异步执行（所有对实例状态的写入均在虚拟线程内部，避免跨线程可见性问题）
         Thread.startVirtualThread(() -> {
+            this.currentConversationId = conversationId;
+            startTimer();
             try {
                 // 1. 加载历史对话
                 loadChatHistory(conversationId);
@@ -185,8 +187,8 @@ public class WebSearchReactAgent extends BaseAgent {
 
             // 本轮结束，判断是否需要执行工具调用
             if (outputMode == OutputMode.TOOL_CALL && !toolCallNames.isEmpty()) {
-                // 执行工具调用
-                String toolResults = executeToolCalls();
+                // 执行工具调用（内部会推送 "🔍 正在搜索信息: xxx" 的 thinking 事件）
+                String toolResults = executeToolCalls(sink);
                 log.info("[{}] 第 {} 轮工具调用完成, 结果长度={}", name, currentRound.get(), toolResults.length());
 
                 // 将助理消息和工具结果加入上下文
@@ -199,14 +201,25 @@ public class WebSearchReactAgent extends BaseAgent {
             }
         }
 
-        // 发送参考链接
-        if (!allSearchResults.isEmpty()) {
-            emitNext(sink, AgentResponse.reference(JSON.toJSONString(allSearchResults), allSearchResults.size()));
+        // 最大轮次兜底：如果循环耗尽且最后一轮是工具调用（textBuffer 为空），强制 LLM 无工具生成最终回答
+        if (textBuffer.isEmpty()) {
+            forceFinalAnswer(sink, messages, conversationId);
         }
 
-        // 持久化 assistant 消息
-        String referenceJson = allSearchResults.isEmpty() ? null : JSON.toJSONString(allSearchResults);
-        saveAssistantMessage(textBuffer.toString(), thinkingBuffer.toString(), referenceJson);
+        // 发送参考链接（只发送 url + title，不含 content 全文）
+        if (!allSearchResults.isEmpty()) {
+            String referenceForClient = buildLightweightReference();
+            emitNext(sink, AgentResponse.reference(referenceForClient, allSearchResults.size()));
+        }
+
+        // 持久化 assistant 消息（reference 只存 url+title，避免超出数据库列长度限制）
+        String referenceJson = allSearchResults.isEmpty() ? null : buildLightweightReference();
+        try {
+            saveAssistantMessage(textBuffer.toString(), thinkingBuffer.toString(), referenceJson);
+        } catch (Exception e) {
+            // 持久化失败不影响用户看到回答，仅记录日志
+            log.error("持久化 assistant 消息失败, conversationId={}, error={}", currentConversationId, e.getMessage());
+        }
 
         // 保存到 ChatMemory
         chatMemory.add(conversationId, List.of(
@@ -297,8 +310,15 @@ public class WebSearchReactAgent extends BaseAgent {
 
     /**
      * 执行所有累积的工具调用
+     * <p>
+     * 对搜索类工具，会先提取 query 参数并推送 thinking 事件（"🔍 正在搜索信息: xxx"），
+     * 保持与 dodo-agent 一致的用户反馈体验。
+     * </p>
+     *
+     * @param sink SSE 事件推送器
+     * @return 工具执行结果文本
      */
-    private String executeToolCalls() {
+    private String executeToolCalls(Sinks.Many<String> sink) {
         StringBuilder results = new StringBuilder();
 
         for (Map.Entry<String, String> entry : toolCallNames.entrySet()) {
@@ -307,6 +327,11 @@ public class WebSearchReactAgent extends BaseAgent {
             String arguments = toolCallArgsBuffers.getOrDefault(toolCallId, new StringBuilder()).toString();
 
             log.info("[{}] 执行工具: {}({})", name, functionName, arguments.length() > 100 ? arguments.substring(0, 100) + "..." : arguments);
+
+            // 搜索类工具：提取 query 参数，推送 thinking 事件
+            if (functionName.contains("search")) {
+                emitSearchThinking(sink, arguments);
+            }
 
             try {
                 // 查找对应的 ToolCallback 并执行
@@ -333,6 +358,50 @@ public class WebSearchReactAgent extends BaseAgent {
     }
 
     /**
+     * 推送搜索 thinking 事件
+     * <p>
+     * 从工具参数中提取搜索关键词，推送 "🔍 正在搜索信息: xxx" 的 thinking 消息，
+     * 让前端在搜索执行期间有实时反馈。
+     * </p>
+     */
+    private void emitSearchThinking(Sinks.Many<String> sink, String arguments) {
+        try {
+            JSONObject args = JSON.parseObject(arguments);
+            String query = args != null ? args.getString("query") : null;
+            String thinkingText = (query != null && !query.isBlank())
+                    ? "🔍 正在搜索信息: " + query + "\n"
+                    : "🔍 正在搜索相关信息\n";
+            appendThinking(sink, thinkingText);
+        } catch (Exception e) {
+            appendThinking(sink, "🔍 正在搜索相关信息\n");
+        }
+    }
+
+    /**
+     * 最大轮次兜底：强制 LLM 不使用工具直接生成最终回答
+     * <p>
+     * 当 ReAct 循环因达到 MAX_ROUNDS 退出且最后一轮仍是工具调用（textBuffer 为空）时，
+     * 追加一条限制 Prompt，要求 LLM 基于已有上下文直接总结回答。
+     * </p>
+     */
+    private void forceFinalAnswer(Sinks.Many<String> sink, List<Message> messages, String conversationId) {
+        log.info("[{}] 已达最大轮次，强制生成最终回答, conversationId={}", name, conversationId);
+
+        messages.add(new UserMessage("""
+                你已达到最大推理轮次限制。
+                请基于当前已有的上下文信息，直接给出最终答案。
+                禁止再调用任何工具。
+                如果信息不完整，请合理总结和说明。
+                """));
+
+        // 不带工具选项的 Prompt，防止 LLM 再次发起工具调用
+        Prompt finalPrompt = new Prompt(messages);
+        chatModel.stream(finalPrompt)
+                .doOnNext(response -> processChunk(sink, response))
+                .blockLast();
+    }
+
+    /**
      * 解析原生 Tavily 搜索结果
      */
     private void parseSearchResults(String toolResult) {
@@ -344,11 +413,11 @@ public class WebSearchReactAgent extends BaseAgent {
             if (resultsArray != null) {
                 for (int i = 0; i < resultsArray.size(); i++) {
                     JSONObject item = resultsArray.getJSONObject(i);
-                    allSearchResults.add(SearchResult.builder()
-                            .url(item.getString("url"))
-                            .title(item.getString("title"))
-                            .content(item.getString("content"))
-                            .build());
+                    allSearchResults.add(new SearchResult(
+                            item.getString("url"),
+                            item.getString("title"),
+                            item.getString("content")
+                    ));
                 }
             }
         } catch (Exception e) {
@@ -374,5 +443,22 @@ public class WebSearchReactAgent extends BaseAgent {
             summary.append("- ").append(entry.getValue()).append("\n");
         }
         return summary.toString();
+    }
+
+    /**
+     * 构建精简的引用 JSON（仅包含 url + title）
+     * <p>
+     * 排除 content 全文以避免：
+     * <ul>
+     *   <li>数据库 reference 列溢出（MysqlDataTruncation）</li>
+     *   <li>SSE 一次性推送大量文本导致前端卡顿</li>
+     * </ul>
+     * </p>
+     */
+    private String buildLightweightReference() {
+        List<Map<String, String>> lightList = allSearchResults.stream()
+                .map(sr -> Map.of("url", sr.url(), "title", sr.title()))
+                .toList();
+        return JSON.toJSONString(lightList);
     }
 }

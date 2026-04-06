@@ -13,11 +13,11 @@ import java.util.List;
  * <p>
  * 前端通过 EventSource 接收此格式的 JSON 字符串，根据 type 字段决定渲染策略：
  * <ul>
- *   <li>text    → 正文内容（逐字追加）</li>
- *   <li>thinking → 思考过程（折叠展示）</li>
+ *   <li>text      → 正文内容（逐字追加）</li>
+ *   <li>thinking  → 思考过程（折叠展示，含搜索状态 "🔍 正在搜索信息: xxx"）</li>
  *   <li>reference → 搜索引用（卡片展示）</li>
  *   <li>recommend → 推荐问题（按钮展示）</li>
- *   <li>error   → 错误信息（Toast 提示）</li>
+ *   <li>error     → 错误信息（Toast 提示）</li>
  * </ul>
  */
 @Data
@@ -26,13 +26,19 @@ import java.util.List;
 @AllArgsConstructor
 public class AgentResponse {
 
-    /** 消息类型 */
+    /**
+     * 消息类型
+     */
     private String type;
 
-    /** 消息内容（String 或 List，根据 type 决定） */
+    /**
+     * 消息内容（String 或 List，根据 type 决定）
+     */
     private Object content;
 
-    /** 引用数量（仅 reference 类型使用） */
+    /**
+     * 引用数量（仅 reference 类型使用）
+     */
     private Integer count;
 
     public static String text(String content) {
