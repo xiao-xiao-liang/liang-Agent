@@ -6,7 +6,59 @@ server:
       force: true
       enabled: true
 
-# ==================== Sprint 0：最小启动配置 ====================
-# 后续 Sprint 将按功能链路逐步追加以下配置：
-#   Sprint 1 → MySQL 数据源、Spring AI（OpenAI/通义千问）、Tavily MCP
-#   Sprint 3 → MinIO 对象存储、Milvus 向量存储
+# ==================== Spring AI ====================
+spring:
+  ai:
+    openai:
+      api-key: ${DASHSCOPE_API_KEY}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/
+      chat:
+        options:
+          model: qwen-plus
+          temperature: 0.7
+          maxTokens: 5000
+      embedding:
+        base-url: https://dashscope.aliyuncs.com/compatible-mode/
+        api-key: ${DASHSCOPE_API_KEY}
+        options:
+          model: text-embedding-v4
+          dimensions: 1024
+
+  # ==================== 数据源 ====================
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    url: jdbc:mysql://127.0.0.1:3306/liang_agent?rewriteBatchedStatements=true&useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # ==================== 文件上传 ====================
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# ==================== MyBatis-Plus ====================
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# ==================== Tavily 搜索引擎 ====================
+tavily:
+  api-key: ${TAVILY_API_KEY}
+  api-url: https://api.tavily.com/search
+
+# ==================== 日志 ====================
+logging:
+  level:
+    org:
+      springframework:
+        ai: INFO
+    io:
+      modelcontextprotocol:
+        client: ERROR
+    com:
+      liang:
+        agent: DEBUG
