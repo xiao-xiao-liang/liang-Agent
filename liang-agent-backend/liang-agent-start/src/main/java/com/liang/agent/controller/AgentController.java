@@ -3,9 +3,11 @@ package com.liang.agent.controller;
 import com.liang.agent.common.convention.result.Result;
 import com.liang.agent.common.convention.result.Results;
 import com.liang.agent.core.agent.websearch.WebSearchReactAgent;
+import com.liang.agent.model.dto.AgentChatRequest;
 import com.liang.agent.service.message.ChatMessageService;
 import com.liang.agent.service.conversation.ConversationService;
 import com.liang.agent.service.task.AgentTaskManager;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,14 +43,13 @@ public class AgentController {
     /**
      * WebSearch Agent 流式对话
      *
-     * @param query          用户问题
-     * @param conversationId 会话ID
+     * @param request 对话请求（包含 query 和 conversationId）
      * @return SSE 事件流
      */
-    @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<String> chatStream(
-            @RequestParam("query") @NotBlank(message = "查询内容不能为空") String query,
-            @RequestParam(value = "conversationId", required = false) String conversationId) {
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> chatStream(@Valid @RequestBody AgentChatRequest request) {
+        String conversationId = request.conversationId();
+        String query = request.query();
 
         // 如果调用方未传会话ID，自动生成一个全新的 UUID（方便接口测试）
         if (conversationId == null || conversationId.isBlank()) {
@@ -56,7 +57,7 @@ public class AgentController {
             log.info("未提供会话ID，自动生成新会话: conversationId={}", conversationId);
         }
 
-        log.info("收到联网搜索请求: conversationId={}, query={}", conversationId, query);
+        log.info("收到联网搜索请求: conversationId={}, queryLength={}", conversationId, query.length());
 
         WebSearchReactAgent agent = new WebSearchReactAgent(
                 chatModel, conversationService, chatMessageService, taskManager, tavilyToolCallbacks);
@@ -77,3 +78,4 @@ public class AgentController {
         return Results.success();
     }
 }
+
