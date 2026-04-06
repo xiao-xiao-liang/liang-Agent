@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.liang.agent.common.response.AgentResponse;
 import com.liang.agent.core.prompt.BaseAgentPrompts;
 import com.liang.agent.model.entity.ChatMessage;
+import com.liang.agent.model.enums.MessageRole;
 import com.liang.agent.service.message.ChatMessageService;
 import com.liang.agent.service.conversation.ConversationService;
 import com.liang.agent.service.task.AgentTaskManager;
@@ -78,6 +79,16 @@ public abstract class BaseAgent {
     protected final ChatMemory chatMemory;
 
     /**
+     * ChatMemory 消息窗口大小
+     */
+    private static final int CHAT_MEMORY_WINDOW_SIZE = 20;
+
+    /**
+     * 从数据库加载的历史消息条数
+     */
+    private static final int HISTORY_LOAD_SIZE = 10;
+
+    /**
      * 当前会话ID
      */
     protected String currentConversationId;
@@ -114,7 +125,7 @@ public abstract class BaseAgent {
         this.taskManager = taskManager;
         this.chatMemory = MessageWindowChatMemory.builder()
                 .chatMemoryRepository(new InMemoryChatMemoryRepository())
-                .maxMessages(20)
+                .maxMessages(CHAT_MEMORY_WINDOW_SIZE)
                 .build();
     }
 
@@ -134,7 +145,7 @@ public abstract class BaseAgent {
      * </p>
      */
     protected void loadChatHistory(String conversationId) {
-        List<ChatMessage> history = chatMessageService.findRecentMessages(conversationId, 10);
+        List<ChatMessage> history = chatMessageService.findRecentMessages(conversationId, HISTORY_LOAD_SIZE);
         if (history.isEmpty()) {
             return;
         }
@@ -144,9 +155,9 @@ public abstract class BaseAgent {
 
         List<Message> messages = new ArrayList<>();
         for (ChatMessage msg : ordered) {
-            if ("user".equals(msg.getRole())) {
+            if (MessageRole.USER == msg.getRole()) {
                 messages.add(new UserMessage(msg.getContent()));
-            } else if ("assistant".equals(msg.getRole())) {
+            } else if (MessageRole.ASSISTANT == msg.getRole()) {
                 messages.add(new AssistantMessage(msg.getContent()));
             }
         }
@@ -247,7 +258,7 @@ public abstract class BaseAgent {
                 }
             }
         } catch (Exception e) {
-            log.warn("推荐问题生成失败: {}", e.getMessage());
+            log.warn("推荐问题生成失败, conversationId={}, error={}", currentConversationId, e.getMessage());
         }
     }
 }
