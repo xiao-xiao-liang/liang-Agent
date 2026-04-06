@@ -1,6 +1,7 @@
 package com.liang.agent.model.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.liang.agent.model.enums.MessageRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,10 +12,10 @@ import java.time.LocalDateTime;
 /**
  * 会话消息实体
  * <p>
- * 使用 role 字段区分消息角色：
+ * 使用 {@link MessageRole} 枚举区分消息角色：
  * <ul>
- *   <li>user — 用户提问，content 为问题内容</li>
- *   <li>assistant — AI 回复，content 为回答内容，附带思考/工具/引用等元数据</li>
+ *   <li>{@link MessageRole#USER} — 用户提问，content 为问题内容</li>
+ *   <li>{@link MessageRole#ASSISTANT} — AI 回复，content 为回答内容，附带思考/工具/引用等元数据</li>
  * </ul>
  * </p>
  */
@@ -34,9 +35,9 @@ public class ChatMessage {
     private String conversationId;
 
     /**
-     * 消息角色：user / assistant
+     * 消息角色
      */
-    private String role;
+    private MessageRole role;
 
     /**
      * 消息内容（user=问题, assistant=回答）
