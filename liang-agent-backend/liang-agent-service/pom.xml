@@ -26,6 +26,13 @@
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
 
+        <!-- 分页插件（3.5.9+ 拆为独立模块，starter 不再传递引入） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
         <!-- Reactor Core（AgentTaskManager 使用 Sinks/Disposable） -->
         <dependency>
             <groupId>io.projectreactor</groupId>
