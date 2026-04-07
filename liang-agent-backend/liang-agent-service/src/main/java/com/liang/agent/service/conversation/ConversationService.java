@@ -3,6 +3,8 @@ package com.liang.agent.service.conversation;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.liang.agent.model.entity.Conversation;
 import com.liang.agent.model.vo.ConversationListVO;
+import com.liang.agent.model.vo.PageResult;
+import com.liang.agent.model.vo.ConversationDetailVO;
 import com.liang.agent.service.message.ChatMessageService;
 
 import java.util.List;
@@ -35,6 +37,23 @@ public interface ConversationService extends IService<Conversation> {
      * @return 会话列表 VO
      */
     List<ConversationListVO> listConversations();
+
+    /**
+     * 分页查询会话列表
+     *
+     * @param pageNum  页码（从 1 开始）
+     * @param pageSize 每页大小
+     * @return 分页结果
+     */
+    PageResult<ConversationListVO> listConversations(int pageNum, int pageSize);
+
+    /**
+     * 查询会话详情（会话元信息 + 全部消息）
+     *
+     * @param conversationId 会话ID
+     * @return 会话详情 VO
+     */
+    ConversationDetailVO getConversationDetail(String conversationId);
 
     /**
      * 删除会话（逻辑删除，级联删除所有消息）
