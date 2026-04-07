@@ -21,6 +21,6 @@ public record PageResult<T>(
      * 计算总页数
      */
     public long totalPages() {
-        return (total + pageSize - 1) / pageSize;
+        return pageSize <= 0 ? 0 : (total + pageSize - 1) / pageSize;
     }
 }
