@@ -10,7 +10,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.*;
  * Controller 仅做参数接收 → Service 调用 → 结果返回的薄编排层。
  * </p>
  */
-@Slf4j
 @Validated
 @RestController
 @RequestMapping("/conversation")
@@ -65,7 +63,6 @@ public class ConversationController {
     @DeleteMapping("/{conversationId}")
     public Result<Void> deleteConversation(
             @PathVariable @NotBlank(message = "会话ID不能为空") String conversationId) {
-        log.info("删除会话: conversationId={}", conversationId);
         conversationService.deleteConversation(conversationId);
         return Results.success();
     }
