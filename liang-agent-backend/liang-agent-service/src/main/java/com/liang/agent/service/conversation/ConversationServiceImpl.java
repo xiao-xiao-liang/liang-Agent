@@ -2,10 +2,10 @@ package com.liang.agent.service.conversation;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.liang.agent.common.convention.exception.ClientException;
-import com.liang.agent.model.entity.ChatMessage;
 import com.liang.agent.model.entity.Conversation;
 import com.liang.agent.model.vo.ConversationListVO;
 import com.liang.agent.model.vo.MessageVO;
@@ -17,11 +17,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 会话服务实现
@@ -33,11 +32,15 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
 
     private final ChatMessageService chatMessageService;
 
+    /**
+     * 会话标题最大长度
+     */
+    private static final int MAX_TITLE_LENGTH = 100;
+
     @Override
     public Conversation getOrCreateConversation(String conversationId, String agentType, String firstQuestion) {
         // 先尝试查找已有会话
-        Conversation existing = getOne(new LambdaQueryWrapper<Conversation>()
-                .eq(Conversation::getConversationId, conversationId));
+        Conversation existing = findByConversationId(conversationId);
 
         if (existing != null) {
             // 已有会话，更新 lastTime
@@ -49,8 +52,11 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         Conversation conversation = new Conversation();
         conversation.setConversationId(conversationId);
         conversation.setAgentType(agentType);
-        // 标题截取前 100 字符
-        conversation.setTitle(firstQuestion.length() > 100 ? firstQuestion.substring(0, 100) : firstQuestion);
+        // 标题截取，firstQuestion 为空时使用默认标题
+        String title = StringUtils.isBlank(firstQuestion) ? "新会话" : (firstQuestion.length() > MAX_TITLE_LENGTH
+                ? firstQuestion.substring(0, MAX_TITLE_LENGTH)
+                : firstQuestion);
+        conversation.setTitle(title);
         conversation.setLastTime(LocalDateTime.now());
 
         try {
@@ -58,8 +64,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         } catch (DuplicateKeyException e) {
             // 并发创建场景：唯一索引拦截第二次插入，回退查询已有记录
             log.info("会话已被并发创建, conversationId={}", conversationId);
-            return getOne(new LambdaQueryWrapper<Conversation>()
-                    .eq(Conversation::getConversationId, conversationId));
+            return findByConversationId(conversationId);
         }
 
         log.info("新建会话: conversationId={}, agentType={}", conversationId, agentType);
@@ -88,8 +93,7 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     @Override
     public ConversationDetailVO getConversationDetail(String conversationId) {
         // 查询会话元信息
-        Conversation conversation = getOne(new LambdaQueryWrapper<Conversation>()
-                .eq(Conversation::getConversationId, conversationId));
+        Conversation conversation = findByConversationId(conversationId);
         if (conversation == null) {
             throw new ClientException("会话不存在: " + conversationId);
         }
@@ -105,11 +109,11 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
         );
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public void deleteConversation(String conversationId) {
         // 检查会话是否存在
-        Conversation existing = getOne(new LambdaQueryWrapper<Conversation>()
-                .eq(Conversation::getConversationId, conversationId));
+        Conversation existing = findByConversationId(conversationId);
         if (existing == null) {
             throw new ClientException("会话不存在: " + conversationId);
         }
@@ -128,33 +132,26 @@ public class ConversationServiceImpl extends ServiceImpl<ConversationMapper, Con
     }
 
     /**
-     * 批量构建 ConversationListVO（含消息数量统计）
-     * <p>
-     * 通过一次批量查询获取每个会话的消息数，避免 N+1 查询。
-     * </p>
+     * 根据 conversationId 查询会话
+     */
+    private Conversation findByConversationId(String conversationId) {
+        return getOne(new LambdaQueryWrapper<Conversation>()
+                .eq(Conversation::getConversationId, conversationId));
+    }
+
+    /**
+     * 批量构建 ConversationListVO
      */
     private List<ConversationListVO> buildConversationListVOs(List<Conversation> conversations) {
         if (conversations.isEmpty()) {
             return List.of();
         }
 
-        // 批量查询每个会话的消息数量（一次 SQL 完成，避免 N+1）
-        List<String> conversationIds = conversations.stream()
-                .map(Conversation::getConversationId)
-                .toList();
-        Map<String, Long> countMap = chatMessageService.list(
-                        new LambdaQueryWrapper<ChatMessage>()
-                                .in(ChatMessage::getConversationId, conversationIds)
-                                .select(ChatMessage::getConversationId)
-                ).stream()
-                .collect(Collectors.groupingBy(ChatMessage::getConversationId, Collectors.counting()));
-
         return conversations.stream()
                 .map(c -> new ConversationListVO(
                         c.getConversationId(),
                         c.getAgentType(),
                         c.getTitle(),
-                        countMap.getOrDefault(c.getConversationId(), 0L).intValue(),
                         c.getLastTime(),
                         c.getCreateTime()
                 ))
