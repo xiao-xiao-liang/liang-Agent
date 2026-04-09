@@ -23,11 +23,8 @@ import java.util.List;
 public class ChatMessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessage> implements ChatMessageService {
 
     @Override
-    public ChatMessage saveUserMessage(String conversationId, String content) {
-        ChatMessage chatMessage = new ChatMessage();
-        chatMessage.setConversationId(conversationId);
+    public ChatMessage saveUserMessage(ChatMessage chatMessage) {
         chatMessage.setRole(MessageRole.USER);
-        chatMessage.setContent(content);
         save(chatMessage);
         return chatMessage;
     }

@@ -14,11 +14,10 @@ public interface ChatMessageService extends IService<ChatMessage> {
     /**
      * 保存用户消息
      *
-     * @param conversationId 会话ID
-     * @param content        用户问题
+     * @param chatMessage 用户消息实体
      * @return 保存后的消息实体
      */
-    ChatMessage saveUserMessage(String conversationId, String content);
+    ChatMessage saveUserMessage(ChatMessage chatMessage);
 
     /**
      * 保存 AI 助手消息

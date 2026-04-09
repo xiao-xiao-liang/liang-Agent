@@ -170,11 +170,17 @@ public abstract class BaseAgent {
     /**
      * 确保会话存在 + 保存用户消息
      */
-    protected void saveUserMessage(String conversationId, String query) {
+    protected void saveUserMessage(String conversationId, String query, String fileId) {
         // 确保会话存在（首次自动创建，后续更新 lastTime）
         conversationService.getOrCreateConversation(conversationId, agentType, query);
         // 保存用户消息
-        chatMessageService.saveUserMessage(conversationId, query);
+        ChatMessage chatMessage = ChatMessage.builder()
+                .conversationId(conversationId)
+                .role(MessageRole.USER)
+                .content(query)
+                .fileId(fileId)
+                .build();
+        chatMessageService.saveUserMessage(chatMessage);
     }
 
     /**
@@ -183,14 +189,20 @@ public abstract class BaseAgent {
      * @param answer    回答内容
      * @param thinking  思考过程
      * @param reference 参考链接 JSON
+     * @param fileId    文件ID（可选）
      */
-    protected void saveAssistantMessage(String answer, String thinking, String reference) {
+    protected void saveAssistantMessage(String answer, String thinking, String reference, String fileId) {
+        String finalThinking = (thinking != null && !thinking.isBlank()) ? thinking : null;
+        String finalTools = usedTools.isEmpty() ? null : String.join(",", usedTools);
+
         ChatMessage chatMessage = ChatMessage.builder()
                 .conversationId(currentConversationId)
+                .role(MessageRole.ASSISTANT)
                 .content(answer)
-                .thinking(thinking)
-                .tools(usedTools.isEmpty() ? null : String.join(",", usedTools))
+                .thinking(finalThinking)
+                .tools(finalTools)
                 .reference(reference)
+                .fileId(fileId)
                 .firstResponseTime(firstResponseTime)
                 .totalResponseTime(System.currentTimeMillis() - startTime)
                 .build();

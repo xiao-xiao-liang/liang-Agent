@@ -128,7 +128,7 @@ public class WebSearchReactAgent extends BaseAgent {
                 // 1. 加载历史对话
                 loadChatHistory(conversationId);
                 // 2. 确保会话存在 + 保存用户消息
-                saveUserMessage(conversationId, query);
+                saveUserMessage(conversationId, query, null);
                 // 3. 开始 ReAct 循环
                 executeReactLoop(sink, conversationId, query);
             } catch (Exception e) {
@@ -215,7 +215,7 @@ public class WebSearchReactAgent extends BaseAgent {
         // 持久化 assistant 消息（reference 只存 url+title，避免超出数据库列长度限制）
         String referenceJson = allSearchResults.isEmpty() ? null : buildLightweightReference();
         try {
-            saveAssistantMessage(textBuffer.toString(), thinkingBuffer.toString(), referenceJson);
+            saveAssistantMessage(textBuffer.toString(), thinkingBuffer.toString(), referenceJson, null);
         } catch (Exception e) {
             // 持久化失败不影响用户看到回答，仅记录日志
             log.error("持久化 assistant 消息失败, conversationId={}, error={}", currentConversationId, e.getMessage());
