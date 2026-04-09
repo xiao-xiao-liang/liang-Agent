@@ -36,3 +36,24 @@ CREATE TABLE chat_message (
     deleted             TINYINT      DEFAULT 0 NOT NULL COMMENT '是否删除 0:正常 1:删除',
     INDEX idx_conversation_time (conversation_id, create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话消息记录表';
+
+-- 文件元数据表
+CREATE TABLE `file_info`
+(
+    `id`              bigint        NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `file_id`         varchar(255)  NOT NULL COMMENT '文件唯一标识',
+    `file_name`       varchar(500)  NOT NULL COMMENT '原始文件名',
+    `file_type`       varchar(50)   NULL DEFAULT NULL COMMENT '文件类型（pdf/doc/docx/txt/png/jpg等）',
+    `file_size`       bigint        NULL DEFAULT NULL COMMENT '文件大小（字节）',
+    `minio_path`      varchar(1000) NULL DEFAULT NULL COMMENT 'MinIO中的存储路径',
+    `extracted_text`  longtext      NULL COMMENT '解析后的纯文本内容',
+    `conversation_id` varchar(255)  NULL DEFAULT NULL COMMENT '会话ID（可选，用于关联特定会话）',
+    `status`          varchar(50)   NULL DEFAULT 'PENDING' COMMENT '文件状态：PENDING/PROCESSING/SUCCESS/FAILED',
+    `embed`           tinyint       NULL DEFAULT NULL COMMENT '是否向量化 0:否 1:是',
+    `create_time`     datetime      NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`     datetime      NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `deleted`         TINYINT       DEFAULT 0 NOT NULL COMMENT '是否删除 0:正常 1:删除',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE INDEX `uk_file_id` (`file_id` ASC) USING BTREE,
+    INDEX `idx_conversation_id` (`conversation_id` ASC) USING BTREE
+) ENGINE = InnoDB COMMENT = '文件元数据表';
