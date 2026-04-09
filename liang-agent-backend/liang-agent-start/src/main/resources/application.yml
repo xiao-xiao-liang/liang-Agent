@@ -62,3 +62,28 @@ logging:
     com:
       liang:
         agent: DEBUG
+
+# ==================== 存储策略 ====================
+storage:
+  type: minio    # 可选: minio / aliyun-oss / rustfs
+
+# ==================== MinIO ====================
+minio:
+  endpoint: http://101.132.158.169:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: liang-agent
+
+# ==================== 向量存储策略 ====================
+vectorstore:
+  type: milvus   # 可选: milvus / elasticsearch / pgvector
+
+# ==================== Milvus ====================
+spring.ai.vectorstore.milvus:
+  client:
+    host: 101.132.158.169
+    port: 19530
+  database-name: liang_agent
+  collection-name: file_vectors
+  embedding-dimension: 1024
+  initialize-schema: true
