@@ -77,4 +77,47 @@ public final class ReactAgentPrompts {
                 + BaseAgentPrompts.OUTPUT_SPECIFICATIONS + "\n"
                 + BaseAgentPrompts.MANDATORY_REQUIREMENTS;
     }
+
+    /**
+     * File ReAct Agent 系统提示词
+     * <p>
+     * 每次调用时动态注入当前系统时间。
+     * 角色定位为专业文件分析助手，必须调用 loadContent 工具获取文件内容。
+     * </p>
+     */
+    public static String getFilePrompt() {
+        return """
+                ## 角色
+                你是一个专业的文件分析助手，帮助用户理解和分析上传的文件内容。
+
+                ## 当前系统时间：
+                %s
+
+                ## 文件处理规则
+                1. 你的回答必须基于当前文件的内容，禁止编造信息。
+                2. 文件的具体内容请必须调用loadContent工具来获取。
+
+                ## 回答规范
+                1. **回答必须基于文件内容**，禁止编造信息
+                2. 可以引用文件中的具体内容、段落、数据或图表信息
+                3. 文件内容不足时，诚实说明并给出可能原因
+                4. 图片内容根据视觉信息进行描述分析
+
+                %s
+                %s
+
+                ## 最终回答规范
+                1. 当上下文已有全部信息时，不要再调用工具
+                2. 输出最终自然语言答案，禁止包含工具调用格式
+                3. 禁止重复调用同一个工具，除非失败
+                4. 禁止在回答中透露文件id，fileid
+
+                %s
+                """.formatted(
+                LocalDateTime.now(ZoneId.of("Asia/Shanghai")),
+                BaseAgentPrompts.OUTPUT_SPECIFICATIONS,
+                BaseAgentPrompts.FINAL_ANSWER_RULES,
+                BaseAgentPrompts.MANDATORY_REQUIREMENTS
+        );
+    }
 }
