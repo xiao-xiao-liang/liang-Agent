@@ -1,7 +1,9 @@
 package com.liang.agent.controller;
 
+import com.alibaba.cloud.ai.graph.StateGraph;
 import com.liang.agent.common.convention.result.Result;
 import com.liang.agent.common.convention.result.Results;
+import com.liang.agent.core.agent.deepresearch.DeepResearchAgent;
 import com.liang.agent.core.agent.file.FileReactAgent;
 import com.liang.agent.core.agent.websearch.WebSearchReactAgent;
 import com.liang.agent.core.tool.FileContentService;
@@ -45,6 +47,7 @@ public class AgentController {
     private final AgentTaskManager taskManager;
     private final List<ToolCallback> tavilyToolCallbacks;
     private final FileContentService fileContentService;
+    private final StateGraph deepResearchGraph;
 
     /**
      * WebSearch Agent 流式对话
@@ -96,6 +99,31 @@ public class AgentController {
         FileReactAgent agent = new FileReactAgent(
                 chatModel, conversationService, chatMessageService, taskManager,
                 fileToolCallbacks, fileId);
+
+        return agent.execute(conversationId, query);
+    }
+
+    /**
+     * DeepResearch Agent 深度研究（流式）
+     *
+     * @param request 对话请求（包含 query 和 conversationId）
+     * @return SSE 事件流
+     */
+    @PostMapping(value = "/deep/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> deepStream(@Valid @RequestBody AgentChatRequest request) {
+        String conversationId = request.conversationId();
+        String query = request.query();
+
+        if (conversationId == null || conversationId.isBlank()) {
+            conversationId = java.util.UUID.randomUUID().toString().replace("-", "");
+            log.info("未提供会话ID，自动生成新会话: conversationId={}", conversationId);
+        }
+
+        log.info("收到深度研究请求: conversationId={}, queryLength={}", conversationId, query.length());
+
+        DeepResearchAgent agent = new DeepResearchAgent(
+                chatModel, conversationService, chatMessageService, taskManager,
+                tavilyToolCallbacks, deepResearchGraph);
 
         return agent.execute(conversationId, query);
     }
